@@ -8,7 +8,7 @@ import type {
   MessageResponse,
   ErrorResponse,
 } from "@/lib/types";
-import type { Message } from "@prisma/client";
+
 
 // Request validation schema
 const ChatMessageSchema = z.object({
@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Map messages to response format
-    const messages: MessageResponse[] = conversation.messages.map((msg : Message) => ({
+    const messages: MessageResponse[] = conversation.messages.map((msg : any) => ({
       id: msg.id,
       sender: msg.sender,
       text: msg.text,
