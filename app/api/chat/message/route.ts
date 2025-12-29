@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { llmService } from "@/lib/llm";
 import { z } from "zod";
+import type {
+  ChatMessageResponse,
+  ConversationHistoryResponse,
+  MessageResponse,
+  ErrorResponse,
+} from "@/lib/types";
 
 // Request validation schema
 const ChatMessageSchema = z.object({
@@ -19,10 +25,14 @@ export async function POST(request: NextRequest) {
     const validation = ChatMessageSchema.safeParse(body);
 
     if (!validation.success) {
-      return NextResponse.json(
-        { error: "Invalid request", details: validation.error.errors },
-        { status: 400 }
-      );
+      const errorResponse: ErrorResponse = {
+        error: "Invalid request",
+        details: validation.error.errors.map((err) => ({
+          path: err.path,
+          message: err.message,
+        })),
+      };
+      return NextResponse.json(errorResponse, { status: 400 });
     }
 
     const { message, sessionId } = validation.data;
@@ -43,10 +53,10 @@ export async function POST(request: NextRequest) {
 
       // If sessionId provided but not found, return error
       if (!conversation) {
-        return NextResponse.json(
-          { error: "Session not found" },
-          { status: 404 }
-        );
+        const errorResponse: ErrorResponse = {
+          error: "Session not found",
+        };
+        return NextResponse.json(errorResponse, { status: 404 });
       }
     } else {
       // Create new conversation
@@ -93,34 +103,30 @@ export async function POST(request: NextRequest) {
     });
 
     // Return response
-    return NextResponse.json(
-      {
-        reply: aiReplyText,
-        sessionId: conversation.id,
-        messageId: aiMessage.id,
-        timestamp: aiMessage.timestamp,
-      },
-      { status: 200 }
-    );
+    const response: ChatMessageResponse = {
+      reply: aiReplyText,
+      sessionId: conversation.id,
+      messageId: aiMessage.id,
+      timestamp: aiMessage.timestamp,
+    };
+    return NextResponse.json(response, { status: 200 });
   } catch (error) {
     console.error("Chat API Error:", error);
 
     // Handle specific error types
     if (error instanceof SyntaxError) {
-      return NextResponse.json(
-        { error: "Invalid JSON in request body" },
-        { status: 400 }
-      );
+      const errorResponse: ErrorResponse = {
+        error: "Invalid JSON in request body",
+      };
+      return NextResponse.json(errorResponse, { status: 400 });
     }
 
     // Generic error response
-    return NextResponse.json(
-      {
-        error: "An error occurred processing your message",
-        message: "Please try again later or contact support",
-      },
-      { status: 500 }
-    );
+    const errorResponse: ErrorResponse = {
+      error: "An error occurred processing your message",
+      message: "Please try again later or contact support",
+    };
+    return NextResponse.json(errorResponse, { status: 500 });
   }
 }
 
@@ -131,10 +137,10 @@ export async function GET(request: NextRequest) {
     const sessionId = searchParams.get("sessionId");
 
     if (!sessionId) {
-      return NextResponse.json(
-        { error: "sessionId is required" },
-        { status: 400 }
-      );
+      const errorResponse: ErrorResponse = {
+        error: "sessionId is required",
+      };
+      return NextResponse.json(errorResponse, { status: 400 });
     }
 
     const conversation = await prisma.conversation.findUnique({
@@ -147,28 +153,33 @@ export async function GET(request: NextRequest) {
     });
 
     if (!conversation) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      const errorResponse: ErrorResponse = {
+        error: "Session not found",
+      };
+      return NextResponse.json(errorResponse, { status: 404 });
     }
 
-    return NextResponse.json(
-      {
-        sessionId: conversation.id,
-        createdAt: conversation.createdAt,
-        updatedAt: conversation.updatedAt,
-        messages: conversation.messages.map((msg) => ({
-          id: msg.id,
-          sender: msg.sender,
-          text: msg.text,
-          timestamp: msg.timestamp,
-        })),
-      },
-      { status: 200 }
-    );
+    // Map messages to response format
+    const messages: MessageResponse[] = conversation.messages.map((msg) => ({
+      id: msg.id,
+      sender: msg.sender,
+      text: msg.text,
+      timestamp: msg.timestamp,
+    }));
+
+    const response: ConversationHistoryResponse = {
+      sessionId: conversation.id,
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+      messages,
+    };
+
+    return NextResponse.json(response, { status: 200 });
   } catch (error) {
     console.error("Get conversation error:", error);
-    return NextResponse.json(
-      { error: "Failed to retrieve conversation" },
-      { status: 500 }
-    );
+    const errorResponse: ErrorResponse = {
+      error: "Failed to retrieve conversation",
+    };
+    return NextResponse.json(errorResponse, { status: 500 });
   }
 }
