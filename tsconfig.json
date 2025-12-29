@@ -11,6 +11,7 @@
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
+    "noImplicitAny": true,
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
@@ -30,10 +31,12 @@
   },
   "include": [
     "next-env.d.ts",
+    "app/**/*.ts",
+    "app/**/*.tsx",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
   ],
   "exclude": [
     "node_modules"
