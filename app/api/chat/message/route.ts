@@ -9,6 +9,14 @@ import type {
   ErrorResponse,
 } from "@/lib/types";
 
+// Message type matching Prisma schema
+interface Message {
+  id: string;
+  conversationId: string;
+  sender: "USER" | "AI";
+  text: string;
+  timestamp: Date;
+}
 
 // Request validation schema
 const ChatMessageSchema = z.object({
@@ -161,12 +169,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Map messages to response format
-    const messages: MessageResponse[] = conversation.messages.map((msg : any) => ({
-      id: msg.id,
-      sender: msg.sender,
-      text: msg.text,
-      timestamp: msg.timestamp,
-    }));
+    const messages: MessageResponse[] = conversation.messages.map(
+      (msg: Message) => ({
+        id: msg.id,
+        sender: msg.sender,
+        text: msg.text,
+        timestamp: msg.timestamp,
+      })
+    );
 
     const response: ConversationHistoryResponse = {
       sessionId: conversation.id,
