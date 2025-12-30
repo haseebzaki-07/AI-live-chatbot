@@ -74,7 +74,7 @@ export class LLMService {
     userMessage: string
   ): Promise<string> {
     if (!this.apiKey) {
-      return "I apologize, but the chat service is currently unavailable. Please try again later or contact support directly.";
+      return "We're temporarily unavailable. Our team is working on it and we'll be back soon!";
     }
 
     try {
@@ -121,7 +121,9 @@ export class LLMService {
       const reply = data.choices?.[0]?.message?.content;
 
       if (!reply) {
-        throw new Error("No reply generated from LLM");
+        throw new Error(
+          "We're experiencing some technical difficulties. Please try again in a moment."
+        );
       }
 
       return reply.trim();
@@ -143,26 +145,47 @@ export class LLMService {
       errorData = {};
     }
 
+    // Rate limit errors
     if (status === 429) {
       return {
         type: "rate_limit",
         message:
-          "Our chat service is experiencing high demand. Please try again in a moment.",
+          "We're receiving a lot of requests right now. Please wait a moment and try again. If the issue persists, feel free to contact our support team at support@techmart.com or 1-800-TECH-MART.",
       };
     }
 
+    // Authentication/Authorization errors (invalid API key, missing key, etc.)
     if (status === 401 || status === 403) {
       return {
         type: "invalid_key",
-        message: "Chat service authentication failed. Please contact support.",
+        message:
+          "We're temporarily unavailable. Our team is working on it and we'll be back soon! If the issue persists, feel free to contact our support team at support@techmart.com or 1-800-TECH-MART.",
       };
     }
 
+    // Server errors (500, 502, 503, 504)
+    if (status >= 500) {
+      return {
+        type: "unknown",
+        message:
+          "Our service is temporarily unavailable. We'll be back soon - thank you for your patience! If the issue persists, feel free to contact our support team at support@techmart.com or 1-800-TECH-MART.",
+      };
+    }
+
+    // Bad request errors (400, 422, etc.)
+    if (status >= 400 && status < 500) {
+      return {
+        type: "unknown",
+        message:
+          "We're experiencing some technical difficulties. Please try again in a moment. If the issue persists, feel free to contact our support team at support@techmart.com or 1-800-TECH-MART.",
+      };
+    }
+
+    // Unknown errors
     return {
       type: "unknown",
       message:
-        errorData.error?.message ||
-        "An error occurred while processing your request.",
+        "We're experiencing some technical difficulties. Please try again in a moment.",
     };
   }
 
@@ -170,20 +193,29 @@ export class LLMService {
    * Handle errors and return user-friendly messages
    */
   private handleError(error: unknown): string {
+    // First, check if it's an LLMError (from handleAPIError)
+    // This must be checked before instanceof Error because LLMError is a plain object
+    if (
+      error &&
+      typeof error === "object" &&
+      "type" in error &&
+      "message" in error
+    ) {
+      const llmError = error as LLMError;
+      return llmError.message;
+    }
+
+    // Handle Error instances
     if (error instanceof Error) {
       if (error.name === "AbortError") {
-        return "I apologize, but the request took too long. Please try asking your question again.";
-      }
-
-      if ("type" in error) {
-        const llmError = error as LLMError;
-        return llmError.message;
+        return "We're having trouble processing your request right now. Please try again in a moment.";
       }
 
       console.error("LLM Error:", error.message);
     }
 
-    return "I apologize, but I'm having trouble processing your request right now. Please try again or contact our support team directly.";
+    // Fallback for any other unknown errors
+    return "We're experiencing some technical difficulties. Please try again in a moment. If the issue persists, feel free to contact our support team at support@techmart.com or 1-800-TECH-MART.";
   }
 
   /**
