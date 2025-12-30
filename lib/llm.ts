@@ -8,20 +8,37 @@ export const STORE_KNOWLEDGE = {
       "Free shipping on orders over $50. Standard shipping takes 5-7 business days. Express shipping (2-3 days) available for $15.",
     international:
       "We ship to most countries. International orders take 10-15 business days.",
+    tracking: "Tracking information will be emailed once your order ships. You can track your package from your account page.",
+    carriers: "Packages are shipped via USPS, UPS, or FedEx depending on destination and speed.",
   },
   returns: {
     policy:
       "30-day return policy for unused items in original packaging. Refunds processed within 5-7 business days after receiving the return.",
     process:
       "Contact support with your order number to initiate a return. We'll provide a prepaid shipping label.",
+    exceptions:
+      "Final sale and perishable items are not eligible for return, unless defective.",
   },
   support: {
     hours: "Monday-Friday: 9 AM - 6 PM EST. Weekend: 10 AM - 4 PM EST",
     contact: "Email: support@techmart.com | Phone: 1-800-TECH-MART",
+    liveChat: "Live chat available on our website during business hours.",
+    faq: "See our Help Center for frequently asked questions.",
   },
   products: {
     categories: "Electronics, Home & Garden, Fashion, Sports & Outdoors",
     warranty: "All electronics come with a 1-year manufacturer warranty",
+    brands: "Top brands include Samsung, Sony, Nike, Adidas, and Apple.",
+    restock: "Popular items are restocked every 2 weeks. Click 'Notify Me' on the product page to get alerts.",
+  },
+  payment: {
+    methods: "We accept Visa, MasterCard, American Express, Discover, PayPal, and Apple Pay.",
+    security: "All payments are encrypted and processed securely.",
+    financing: "Buy now, pay later options are available at checkout for eligible customers.",
+  },
+  storeLocations: {
+    physicalStores: "Visit our flagship store in New York City at 123 TechMart Ave.",
+    pickup: "In-store pickup available for select items in NYC.",
   },
 };
 

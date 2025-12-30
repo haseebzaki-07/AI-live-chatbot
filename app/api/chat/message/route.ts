@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { llmService } from "@/lib/llm";
+import {
+  getCachedConversation,
+  cacheConversation,
+  invalidateConversationCache,
+} from "@/lib/redis";
 import { z } from "zod";
 import type {
   ChatMessageResponse,
@@ -16,6 +21,15 @@ interface Message {
   sender: "USER" | "AI";
   text: string;
   timestamp: Date;
+}
+
+// Conversation type with messages
+interface ConversationWithMessages {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  metadata: any;
+  messages: Message[];
 }
 
 // Request validation schema
@@ -47,29 +61,40 @@ export async function POST(request: NextRequest) {
     const { message, sessionId } = validation.data;
 
     // Get or create conversation
-    let conversation;
+    let conversation: ConversationWithMessages;
     if (sessionId) {
-      // Try to find existing conversation
-      conversation = await prisma.conversation.findUnique({
-        where: { id: sessionId },
-        include: {
-          messages: {
-            orderBy: { timestamp: "asc" },
-            take: 10, // Limit history for LLM context
+      // Try cache first
+      const cached = await getCachedConversation(sessionId);
+      if (cached) {
+        conversation = cached as ConversationWithMessages;
+      } else {
+        // Cache miss - fetch from DB
+        const dbConversation = await prisma.conversation.findUnique({
+          where: { id: sessionId },
+          include: {
+            messages: {
+              orderBy: { timestamp: "asc" },
+              take: 10, // Limit history for LLM context
+            },
           },
-        },
-      });
+        });
 
-      // If sessionId provided but not found, return error
-      if (!conversation) {
-        const errorResponse: ErrorResponse = {
-          error: "Session not found",
-        };
-        return NextResponse.json(errorResponse, { status: 404 });
+        // If sessionId provided but not found, return error
+        if (!dbConversation) {
+          const errorResponse: ErrorResponse = {
+            error: "Session not found",
+          };
+          return NextResponse.json(errorResponse, { status: 404 });
+        }
+
+        conversation = dbConversation as ConversationWithMessages;
+
+        // Cache the conversation
+        await cacheConversation(sessionId, conversation);
       }
     } else {
       // Create new conversation
-      conversation = await prisma.conversation.create({
+      const newConversation = await prisma.conversation.create({
         data: {
           metadata: {
             startedAt: new Date().toISOString(),
@@ -79,6 +104,8 @@ export async function POST(request: NextRequest) {
           messages: true,
         },
       });
+
+      conversation = newConversation as ConversationWithMessages;
     }
 
     // Save user message to database
@@ -111,6 +138,9 @@ export async function POST(request: NextRequest) {
       data: { updatedAt: new Date() },
     });
 
+    // Invalidate cache after new message
+    await invalidateConversationCache(conversation.id);
+
     // Return response
     const response: ChatMessageResponse = {
       reply: aiReplyText,
@@ -139,7 +169,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Optional: GET endpoint to retrieve conversation history
+// GET endpoint to retrieve conversation history with caching
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -152,20 +182,34 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(errorResponse, { status: 400 });
     }
 
-    const conversation = await prisma.conversation.findUnique({
-      where: { id: sessionId },
-      include: {
-        messages: {
-          orderBy: { timestamp: "asc" },
-        },
-      },
-    });
+    // Try cache first
+    const cached = await getCachedConversation(sessionId);
+    let conversation: ConversationWithMessages;
 
-    if (!conversation) {
-      const errorResponse: ErrorResponse = {
-        error: "Session not found",
-      };
-      return NextResponse.json(errorResponse, { status: 404 });
+    if (cached) {
+      conversation = cached as ConversationWithMessages;
+    } else {
+      // Cache miss - fetch from DB
+      const dbConversation = await prisma.conversation.findUnique({
+        where: { id: sessionId },
+        include: {
+          messages: {
+            orderBy: { timestamp: "asc" },
+          },
+        },
+      });
+
+      if (!dbConversation) {
+        const errorResponse: ErrorResponse = {
+          error: "Session not found",
+        };
+        return NextResponse.json(errorResponse, { status: 404 });
+      }
+
+      conversation = dbConversation as ConversationWithMessages;
+
+      // Cache for future requests
+      await cacheConversation(sessionId, conversation);
     }
 
     // Map messages to response format
